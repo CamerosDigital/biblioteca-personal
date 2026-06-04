@@ -91,15 +91,11 @@ letter_tabs = "\n".join(
 sections = []
 for author, books in library.items():
     def card_html(b):
-        synopsis_div = (
-            f'          <div class="book-synopsis">{escape(b["synopsis"])}</div>\n'
-            if b.get('synopsis') else ''
-        )
+        synopsis_attr = f' data-synopsis="{escape(b["synopsis"])}"' if b.get('synopsis') else ''
         return (
-            f'        <figure class="book-card">\n'
+            f'        <figure class="book-card"{synopsis_attr}>\n'
             f'          <img src="{escape(b["src"])}" alt="{escape(b["title"])}" loading="lazy">\n'
             f'          <figcaption>{escape(b["title"])}</figcaption>\n'
-            f'{synopsis_div}'
             f'        </figure>'
         )
     cards = "\n".join(card_html(b) for b in books)
@@ -321,20 +317,54 @@ html = f"""<!DOCTYPE html>
       cursor: pointer;
     }}
 
-    .book-synopsis {{
+    /* ── Synopsis modal ── */
+    #synopsis-modal {{
       display: none;
-      font-size: 10px;
-      line-height: 1.4;
-      color: var(--text-muted);
-      padding: 5px 2px 0;
+      position: fixed;
+      inset: 0;
+      z-index: 300;
+      background: rgba(0,0,0,.55);
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
     }}
-
-    .book-card.synopsis-open .book-synopsis {{
-      display: -webkit-box;
-      -webkit-line-clamp: 3;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
+    #synopsis-modal.open {{ display: flex; }}
+    #synopsis-box {{
+      background: #fff;
+      color: #111;
+      border-radius: 12px;
+      padding: 22px 20px 20px;
+      max-width: 400px;
+      width: 100%;
+      position: relative;
+      font-size: 15px;
+      line-height: 1.65;
+      box-shadow: 0 12px 48px rgba(0,0,0,.4);
     }}
+    #synopsis-title {{
+      font-weight: 700;
+      font-size: 15px;
+      margin-bottom: 10px;
+      padding-right: 28px;
+      color: #111;
+    }}
+    #synopsis-text {{
+      color: #333;
+      font-size: 14px;
+      line-height: 1.6;
+    }}
+    #synopsis-close {{
+      position: absolute;
+      top: 12px; right: 14px;
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      color: #555;
+      line-height: 1;
+      padding: 2px 4px;
+    }}
+    #synopsis-close:hover {{ color: #000; }}
 
     .book-card img {{
       width: 100%;
@@ -421,6 +451,14 @@ html = f"""<!DOCTYPE html>
 {main_content}
     <div id="no-results">No se encontraron resultados.</div>
   </main>
+</div>
+
+<div id="synopsis-modal">
+  <div id="synopsis-box">
+    <button id="synopsis-close">&#10005;</button>
+    <div id="synopsis-title"></div>
+    <p id="synopsis-text"></p>
+  </div>
 </div>
 
 <script>
@@ -512,17 +550,22 @@ html = f"""<!DOCTYPE html>
 
   sections.forEach(s => observer.observe(s));
 
-  // Synopsis toggle on cover click
-  let openCard = null;
-  document.querySelectorAll('.book-card').forEach(card => {{
-    if (!card.querySelector('.book-synopsis')) return;
+  // Synopsis modal
+  const synopsisModal = document.getElementById('synopsis-modal');
+  const synopsisTitle = document.getElementById('synopsis-title');
+  const synopsisText  = document.getElementById('synopsis-text');
+
+  function closeModal() {{ synopsisModal.classList.remove('open'); }}
+  document.getElementById('synopsis-close').addEventListener('click', closeModal);
+  synopsisModal.addEventListener('click', e => {{ if (e.target === synopsisModal) closeModal(); }});
+  document.addEventListener('keydown', e => {{ if (e.key === 'Escape') closeModal(); }});
+
+  document.querySelectorAll('.book-card[data-synopsis]').forEach(card => {{
     card.classList.add('has-synopsis');
     card.addEventListener('click', () => {{
-      if (openCard && openCard !== card) {{
-        openCard.classList.remove('synopsis-open');
-      }}
-      card.classList.toggle('synopsis-open');
-      openCard = card.classList.contains('synopsis-open') ? card : null;
+      synopsisTitle.textContent = card.querySelector('img').alt;
+      synopsisText.textContent  = card.dataset.synopsis;
+      synopsisModal.classList.add('open');
     }});
   }});
 </script>
