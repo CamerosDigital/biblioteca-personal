@@ -176,6 +176,7 @@
       margin-bottom: 40px;
     }
     section.hidden { display: none; }
+    figure.hidden { display: none; }
 
     h2 {
       font-size: 15px;
@@ -7759,21 +7760,24 @@
     let visible = 0;
     sections.forEach(sec => {
       const author = sec.dataset.author.toLowerCase();
-      const titles = [...sec.querySelectorAll('figcaption')].map(f => f.textContent.toLowerCase());
       const matchesLetter = !letter || sec.dataset.author[0].toUpperCase() === letter;
-      const matchesQuery = !q || author.includes(q) || titles.some(t => t.includes(q));
-      const show = matchesLetter && matchesQuery;
-      sec.classList.toggle('hidden', !show);
-      if (show) visible++;
+      let sectionVisible = false;
+      sec.querySelectorAll('figure.book-card').forEach(card => {
+        const title = (card.querySelector('figcaption')?.textContent || '').toLowerCase();
+        const matchesQuery = !q || author.includes(q) || title.includes(q);
+        const show = matchesLetter && matchesQuery;
+        card.classList.toggle('hidden', !show);
+        if (show) sectionVisible = true;
+      });
+      sec.classList.toggle('hidden', !sectionVisible);
+      if (sectionVisible) visible++;
     });
     noResults.style.display = visible === 0 ? 'block' : 'none';
 
     // Sync nav
     navLinks.forEach(a => {
-      const name = a.dataset.author.toLowerCase();
-      const matchLetter = !letter || a.dataset.author[0].toUpperCase() === letter;
-      const matchQuery = !q || name.includes(q);
-      a.parentElement.style.display = (matchLetter && matchQuery) ? '' : 'none';
+      const sec = document.getElementById(a.getAttribute('href').slice(1));
+      a.parentElement.style.display = sec && !sec.classList.contains('hidden') ? '' : 'none';
     });
   }
 
