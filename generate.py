@@ -3,6 +3,7 @@
 
 import re
 import shutil
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from html import escape
 from urllib.parse import quote
@@ -14,6 +15,19 @@ COVERS_DIR   = PROJECT_DIR / "covers"
 
 def clean_title(folder_name):
     return re.sub(r'\s*\(\d+\)$', '', folder_name).strip()
+
+def read_synopsis(opf_path):
+    try:
+        tree = ET.parse(opf_path)
+        root = tree.getroot()
+        ns = {'dc': 'http://purl.org/dc/elements/1.1/'}
+        desc_el = root.find('.//dc:description', ns)
+        if desc_el is None or not desc_el.text:
+            return ''
+        text = re.sub(r'<[^>]+>', ' ', desc_el.text)
+        return re.sub(r'\s+', ' ', text).strip()
+    except Exception:
+        return ''
 
 def anchor(author):
     return re.sub(r'[^a-z0-9]', '-', author.lower())
@@ -44,9 +58,11 @@ for author_dir in sorted(CALIBRE_ROOT.iterdir(), key=lambda p: p.name.lower()):
             copied += 1
         else:
             skipped += 1
+        synopsis = read_synopsis(book_dir / 'metadata.opf')
         books.append({
             'title': clean_title(book_dir.name),
             'src': rel_url(dest),
+            'synopsis': synopsis,
         })
     if books:
         library[author_dir.name] = books
@@ -74,13 +90,19 @@ letter_tabs = "\n".join(
 # Generate main content sections
 sections = []
 for author, books in library.items():
-    cards = "\n".join(
-        f'        <figure class="book-card">\n'
-        f'          <img src="{escape(b["src"])}" alt="{escape(b["title"])}" loading="lazy">\n'
-        f'          <figcaption>{escape(b["title"])}</figcaption>\n'
-        f'        </figure>'
-        for b in books
-    )
+    def card_html(b):
+        synopsis_div = (
+            f'          <div class="book-synopsis">{escape(b["synopsis"])}</div>\n'
+            if b.get('synopsis') else ''
+        )
+        return (
+            f'        <figure class="book-card">\n'
+            f'          <img src="{escape(b["src"])}" alt="{escape(b["title"])}" loading="lazy">\n'
+            f'          <figcaption>{escape(b["title"])}</figcaption>\n'
+            f'{synopsis_div}'
+            f'        </figure>'
+        )
+    cards = "\n".join(card_html(b) for b in books)
     sections.append(
         f'    <section id="{anchor(author)}" data-author="{escape(author)}">\n'
         f'      <h2>{escape(author)} <span class="author-count">({len(books)})</span></h2>\n'
@@ -295,6 +317,25 @@ html = f"""<!DOCTYPE html>
       cursor: default;
     }}
 
+    .book-card.has-synopsis {{
+      cursor: pointer;
+    }}
+
+    .book-synopsis {{
+      display: none;
+      font-size: 10px;
+      line-height: 1.4;
+      color: var(--text-muted);
+      padding: 5px 2px 0;
+    }}
+
+    .book-card.synopsis-open .book-synopsis {{
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }}
+
     .book-card img {{
       width: 100%;
       aspect-ratio: 2/3;
@@ -470,6 +511,20 @@ html = f"""<!DOCTYPE html>
   }}, {{ rootMargin: '-20% 0px -70% 0px', threshold: 0 }});
 
   sections.forEach(s => observer.observe(s));
+
+  // Synopsis toggle on cover click
+  let openCard = null;
+  document.querySelectorAll('.book-card').forEach(card => {{
+    if (!card.querySelector('.book-synopsis')) return;
+    card.classList.add('has-synopsis');
+    card.addEventListener('click', () => {{
+      if (openCard && openCard !== card) {{
+        openCard.classList.remove('synopsis-open');
+      }}
+      card.classList.toggle('synopsis-open');
+      openCard = card.classList.contains('synopsis-open') ? card : null;
+    }});
+  }});
 </script>
 </body>
 </html>
