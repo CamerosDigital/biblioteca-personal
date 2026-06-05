@@ -336,11 +336,14 @@ html = f"""<!DOCTYPE html>
       border-radius: 12px;
       padding: 22px 20px 20px;
       max-width: 400px;
+      max-height: 80dvh;
       width: 100%;
       position: relative;
       font-size: 15px;
       line-height: 1.65;
       box-shadow: 0 12px 48px rgba(0,0,0,.4);
+      display: flex;
+      flex-direction: column;
     }}
     #synopsis-title {{
       font-weight: 700;
@@ -353,6 +356,8 @@ html = f"""<!DOCTYPE html>
       color: #333;
       font-size: 14px;
       line-height: 1.6;
+      overflow-y: auto;
+      flex: 1;
     }}
     #synopsis-close {{
       position: absolute;
